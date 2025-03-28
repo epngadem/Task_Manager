@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Tableau de bord - Mes Tâches</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f4f7fa;
+      padding-top: 60px;
+    }
+    .card {
+      border-radius: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>📋 Mes Tâches</h2>
+    <div>
+      <button class="btn btn-primary me-2" onclick="window.location.href='/ajouter-tache.html'">+ Ajouter</button>
+      <button class="btn btn-outline-danger" onclick="logout()">Se déconnecter</button>
+    </div>
+  </div>
+
+  <div id="taskList" class="row g-3">
+    <p>Chargement...</p>
+  </div>
+</div>
+
+<!-- MODAL de modification -->
+<div class="modal fade" id="editTaskModal" tabindex="-1" aria-labelledby="editTaskModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Modifier la tâche</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editTaskForm">
+          <input type="hidden" id="editTaskId">
+          <div class="mb-3">
+            <label for="editTitle" class="form-label">Titre</label>
+            <input type="text" class="form-control" id="editTitle" required>
+          </div>
+          <div class="mb-3">
+            <label for="editDescription" class="form-label">Description</label>
+            <textarea class="form-control" id="editDescription" rows="2" required></textarea>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="editCompleted">
+            <label class="form-check-label" for="editCompleted">Tâche complétée</label>
+          </div>
+          <button type="submit" class="btn btn-success w-100">💾 Enregistrer</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPT -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const userId = sessionStorage.getItem("userId");
+
+  if (!userId) {
+    window.location.href = "/login.html";
+  }
+
+  async function fetchTasks() {
+    const taskList = document.getElementById("taskList");
+
+    try {
+      const response = await fetch("http://localhost:8080/tasks");
+      const tasks = await response.json();
+      const userTasks = tasks.filter(task => task.user.id == userId);
+
+      taskList.innerHTML = "";
+
+      if (userTasks.length === 0) {
+        taskList.innerHTML = "<p>Aucune tâche pour le moment.</p>";
+        return;
+      }
+
+      userTasks.forEach(task => {
+        const card = document.createElement("div");
+        card.className = "col-md-6";
+
+        card.innerHTML = `
+          <div class="card p-3 shadow-sm">
+            <h5>${task.title}</h5>
+            <p class="text-muted">${task.description}</p>
+            <span class="badge ${task.completed ? 'bg-success' : 'bg-warning text-dark'}">
+              ${task.completed ? "Complétée" : "En cours"}
+            </span>
+            <div class="mt-3 d-flex gap-2">
+              <button class="btn btn-sm btn-outline-primary" onclick='openEditModal(${JSON.stringify(task)})'>✏️ Modifier</button>
+            </div>
+          </div>
+        `;
+
+        taskList.appendChild(card);
+      });
+
+    } catch (error) {
+      console.error(error);
+      taskList.innerHTML = "<p class='text-danger'>Erreur lors du chargement des tâches.</p>";
+    }
+  }
+
+  function logout() {
+    sessionStorage.removeItem("userId");
+    window.location.href = "/login.html";
+  }
+
+  const editModal = new bootstrap.Modal(document.getElementById("editTaskModal"));
+
+  function openEditModal(task) {
+    document.getElementById("editTaskId").value = task.id;
+    document.getElementById("editTitle").value = task.title;
+    document.getElementById("editDescription").value = task.description;
+    document.getElementById("editCompleted").checked = task.completed;
+    editModal.show();
+  }
+
+  document.getElementById("editTaskForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const id = document.getElementById("editTaskId").value;
+    const updatedTask = {
+      title: document.getElementById("editTitle").value,
+      description: document.getElementById("editDescription").value,
+      completed: document.getElementById("editCompleted").checked
+    };
+
+    const response = await fetch(`http://localhost:8080/tasks/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updatedTask)
+    });
+
+    if (response.ok) {
+      alert("Tâche mise à jour !");
+      editModal.hide();
+      fetchTasks();
+    } else {
+      alert("Erreur lors de la mise à jour de la tâche.");
+    }
+  });
+
+  fetchTasks();
+</script>
+
+</body>
+</html>
